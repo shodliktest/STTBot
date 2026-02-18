@@ -12,8 +12,6 @@ def get_uz_time():
 def clean_text(text):
     """
     Telegram HTML rejimi uchun matnni tozalash.
-    DIQQAT: Apostrof (') va qo'shtirnoq (") o'zgartirilmaydi!
-    Faqat &, <, > belgilarini xavfsiz holatga keltiramiz.
     """
     if not text:
         return ""
@@ -33,4 +31,31 @@ def format_time_stamp(seconds):
     minutes = int(seconds // 60)
     secs = int(seconds % 60)
     return f"[{minutes:02d}:{secs:02d}]"
+
+def split_html_text(text, limit=4000):
+    """
+    HTML matnni xavfsiz bo'laklarga bo'lish mantiqi.
+    Agar matn limitdan oshsa, uni xatboshilar bo'yicha bo'ladi.
+    """
+    if len(text) <= limit:
+        return [text]
+    
+    chunks = []
+    while text:
+        if len(text) <= limit:
+            chunks.append(text)
+            break
+        
+        # Eng yaqin xatboshini topish
+        split_at = text.rfind('\n\n', 0, limit)
+        if split_at == -1:
+            split_at = text.rfind('\n', 0, limit)
+        if split_at == -1:
+            split_at = text.rfind(' ', 0, limit)
+        if split_at == -1:
+            split_at = limit
+            
+        chunks.append(text[:split_at])
+        text = text[split_at:].lstrip()
+    return chunks
     
