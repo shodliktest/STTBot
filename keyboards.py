@@ -13,7 +13,7 @@ def get_main_menu(uid):
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
-# 2. TARJIMA MENYUSI (Izohli)
+# 2. TARJIMA MENYUSI
 def get_tr_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="❌ Tarjima qilinmasin (Original)", callback_data="tr_orig")
@@ -23,7 +23,7 @@ def get_tr_kb():
     kb.adjust(1)
     return kb.as_markup()
 
-# 3. KO'RINISH MENYUSI (Split vs Full)
+# 3. KO'RINISH MENYUSI
 def get_split_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="⏱ Time Split (Vaqt [00:10] bilan)", callback_data="v_split")
@@ -31,10 +31,9 @@ def get_split_kb():
     kb.adjust(1)
     return kb.as_markup()
 
-# 4. FORMAT MENYUSI (Chat o'ng tomonda)
+# 4. FORMAT MENYUSI
 def get_format_kb():
     kb = InlineKeyboardBuilder()
-    # Avval TXT (chapda), keyin Chat (o'ngda)
     kb.button(text="📁 TXT Fayl (Hujjat)", callback_data="f_txt")
     kb.button(text="💬 Chat (Xabar)", callback_data="f_chat")
     kb.adjust(2)
