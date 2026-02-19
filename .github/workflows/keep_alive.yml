@@ -1,15 +1,74 @@
-name: Streamlit Keep Alive
+name: Streamlit Ultra Wakeup (Button Fixed)
 
 on:
   schedule:
-    # Har kuni 1 marta yoki har 6 soatda kirib turadi
     - cron: '*/30 * * * *'
-  workflow_dispatch: # O'zingiz ham xohlaganda yurgizishingiz uchun
+  workflow_dispatch:
 
 jobs:
-  ping_streamlit:
+  browser_ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Open Streamlit App
-        run: curl -s https://audiov.streamlit.app/ > /dev/null
-        
+      - uses: actions/checkout@v4
+      
+      - name: Pythonni sozlash
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Playwright o'rnatish
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Brauzerda uyg'otish tugmasini bosish
+        run: |
+          python -c "
+          from playwright.sync_api import sync_playwright
+          import time
+
+          def run_wakeup():
+              with sync_playwright() as p:
+                  browser = p.chromium.launch()
+                  page = browser.new_page()
+                  url = 'https://audiov.streamlit.app/'
+                  
+                  for attempt in range(1, 4):
+                      print(f'🚀 Urinish #{attempt}: {url} ga kirilmoqda...')
+                      try:
+                          # Sahifani yuklaymiz
+                          page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                          
+                          # 'Yes, get this app back up!' tugmasini qidirish
+                          # exact=False qilganimiz sababi - matn ichida bo'lsa ham topadi
+                          wake_up_button = page.get_by_role('button', name='Yes, get this app back up!', exact=False)
+                          
+                          if wake_up_button.is_visible():
+                              print('🔔 Uygʻotish tugmasi topildi! Bosilmoqda...')
+                              wake_up_button.click()
+                              print('⏳ Tugma bosildi, Streamlit uygʻonishi uchun 40 soniya kutilmoqda...')
+                              time.sleep(40)
+                              # Qayta yuklash orqali tekshiramiz
+                              page.reload(wait_until='networkidle')
+                          else:
+                              print('✅ Uygʻotish tugmasi koʻrinmadi (Sayt allaqachon uygʻoq).')
+
+                          # Yakuniy tekshiruv
+                          page.wait_for_load_state('networkidle', timeout=60000)
+                          print(f'🎉 Muvaffaqiyat! Sahifa sarlavhasi: {page.title()}')
+                          browser.close()
+                          return True
+                          
+                      except Exception as e:
+                          print(f'⚠️ {attempt}-urinishda xato: {str(e)[:100]}')
+                          if attempt < 3:
+                              time.sleep(20)
+                  
+                  browser.close()
+                  return False
+
+          if not run_wakeup():
+              print('❌ Xato: Botni uygʻotib boʻlmadi.')
+              exit(1)
+          "
+          
