@@ -3,7 +3,7 @@ name: Streamlit Keep Alive
 on:
   schedule:
     # Har kuni 1 marta yoki har 6 soatda kirib turadi
-    - cron: '0 */6 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch: # O'zingiz ham xohlaganda yurgizishingiz uchun
 
 jobs:
