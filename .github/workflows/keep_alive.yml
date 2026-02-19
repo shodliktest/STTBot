@@ -1,7 +1,8 @@
-name: Streamlit Ultra Wakeup (Button Fixed)
+name: Transcript App Wakeup
 
 on:
   schedule:
+    # Har 30 daqiqada tekshiradi
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
@@ -29,46 +30,63 @@ jobs:
 
           def run_wakeup():
               with sync_playwright() as p:
-                  browser = p.chromium.launch()
-                  page = browser.new_page()
+                  # Brauzerni haqiqiy foydalanuvchi sifatida ishga tushirish
+                  browser = p.chromium.launch(headless=True)
+                  context = browser.new_context(
+                      user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+                  )
+                  page = context.new_page()
+                  
+                  # SIZNING YANGI LINKINGIZ:
                   url = 'https://audiov.streamlit.app/'
                   
                   for attempt in range(1, 4):
                       print(f'🚀 Urinish #{attempt}: {url} ga kirilmoqda...')
                       try:
-                          # Sahifani yuklaymiz
                           page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                          time.sleep(10) # Streamlit elementlari chizilishi uchun kutamiz
+
+                          button_text = 'Yes, get this app back up!'
                           
-                          # 'Yes, get this app back up!' tugmasini qidirish
-                          # exact=False qilganimiz sababi - matn ichida bo'lsa ham topadi
-                          wake_up_button = page.get_by_role('button', name='Yes, get this app back up!', exact=False)
+                          # Barcha tugmalarni chuqur qidirish
+                          buttons = page.query_selector_all('button')
+                          found = False
                           
-                          if wake_up_button.is_visible():
-                              print('🔔 Uygʻotish tugmasi topildi! Bosilmoqda...')
-                              wake_up_button.click()
-                              print('⏳ Tugma bosildi, Streamlit uygʻonishi uchun 40 soniya kutilmoqda...')
-                              time.sleep(40)
-                              # Qayta yuklash orqali tekshiramiz
+                          for btn in buttons:
+                              if button_text.lower() in btn.inner_text().lower():
+                                  print(f'🔔 Uygʻotish tugmasi matn orqali topildi! Bosilmoqda...')
+                                  btn.click()
+                                  found = True
+                                  break
+                          
+                          if not found:
+                              # Locator orqali zaxira qidiruv
+                              btn = page.locator(f'button:has-text(\"{button_text}\")')
+                              if btn.is_visible():
+                                  print('🔔 Uygʻotish tugmasi locator orqali topildi! Bosilmoqda...')
+                                  btn.click()
+                                  found = True
+
+                          if found:
+                              print('⏳ Tugma bosildi, Streamlit uygʻonishi uchun 45 soniya kutilmoqda...')
+                              time.sleep(45)
                               page.reload(wait_until='networkidle')
                           else:
-                              print('✅ Uygʻotish tugmasi koʻrinmadi (Sayt allaqachon uygʻoq).')
+                              print('✅ Tugma topilmadi. Sahifa allaqachon uygʻoq!')
 
-                          # Yakuniy tekshiruv
-                          page.wait_for_load_state('networkidle', timeout=60000)
                           print(f'🎉 Muvaffaqiyat! Sahifa sarlavhasi: {page.title()}')
                           browser.close()
                           return True
                           
                       except Exception as e:
-                          print(f'⚠️ {attempt}-urinishda xato: {str(e)[:100]}')
-                          if attempt < 3:
-                              time.sleep(20)
+                          print(f'⚠️ Xato yuz berdi: {str(e)[:100]}')
+                          time.sleep(15)
                   
                   browser.close()
                   return False
 
           if not run_wakeup():
-              print('❌ Xato: Botni uygʻotib boʻlmadi.')
+              print('❌ 3 marta urinishdan keyin ham sahifani ochib boʻlmadi.')
               exit(1)
           "
           
