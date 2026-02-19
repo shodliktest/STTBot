@@ -13,11 +13,12 @@ def get_main_menu(uid):
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
-# 2. TARJIMA MENYUSI
+# 2. TARJIMA MENYUSI (Yangi tugma qo'shildi)
 def get_tr_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="❌ Tarjima qilinmasin (Original)", callback_data="tr_orig")
-    kb.button(text="🇺🇿 O'zbekchaga (Qavs ichida)", callback_data="tr_uz")
+    kb.button(text="🇺🇿 O'zbekchaga (Original bilan)", callback_data="tr_uz")
+    kb.button(text="🇺🇿 Faqat O'zbekcha (Originalsiz)", callback_data="tr_uz_only")
     kb.button(text="🇷🇺 Ruschaga (Qavs ichida)", callback_data="tr_ru")
     kb.button(text="🇬🇧 Inglizchaga (Qavs ichida)", callback_data="tr_en")
     kb.adjust(1)
@@ -26,7 +27,7 @@ def get_tr_kb():
 # 3. KO'RINISH MENYUSI
 def get_split_kb():
     kb = InlineKeyboardBuilder()
-    kb.button(text="⏱ Time Split (Vaqt [00:10] bilan)", callback_data="v_split")
+    kb.button(text="⏱ Time Split (Vaqt bilan)", callback_data="v_split")
     kb.button(text="📖 Full Context (Yaxlit matn)", callback_data="v_full")
     kb.adjust(1)
     return kb.as_markup()
@@ -34,7 +35,7 @@ def get_split_kb():
 # 4. FORMAT MENYUSI
 def get_format_kb():
     kb = InlineKeyboardBuilder()
-    kb.button(text="📁 TXT Fayl (Hujjat)", callback_data="f_txt")
+    kb.button(text="📁 TXT Fayl", callback_data="f_txt")
     kb.button(text="💬 Chat (Xabar)", callback_data="f_chat")
     kb.adjust(2)
     return kb.as_markup()
@@ -43,12 +44,12 @@ def get_format_kb():
 def get_admin_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="📊 Statistika", callback_data="adm_stats")
-    kb.button(text="📋 Ro'yxat", callback_data="adm_list")
-    kb.button(text="📢 Broadcast", callback_data="adm_bc")
+    kb.button(text="📋 Userlar Ro'yxati", callback_data="adm_list")
+    kb.button(text="📢 Broadcast (Reklama)", callback_data="adm_bc")
     kb.adjust(1)
     return kb.as_markup()
 
-# 6. ALOQA UCHUN TUGMA
+# 6. ALOQA
 def get_contact_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="✍️ Adminga yozish", callback_data="msg_to_admin")
