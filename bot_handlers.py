@@ -2,7 +2,7 @@ import asyncio
 import os
 import re
 import hashlib
-import gc  # RAMni tozalash uchun kutubxona
+import gc
 import streamlit as st
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -13,7 +13,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import whisper
 from deep_translator import GoogleTranslator
 
-# MODULLAR
+# BIZNING MODULLAR
 from config import BOT_TOKEN, ADMIN_ID
 from database import (
     update_user, update_stats, get_all_users, get_stats, 
@@ -25,6 +25,12 @@ from keyboards import (
     get_main_menu, get_tr_kb, get_split_kb, get_format_kb, 
     get_admin_kb, get_list_format_kb, get_contact_kb,
     get_transcripts_pagination_kb, get_transcript_format_kb
+)
+# MATNLAR FAYLIDAN CHAQIRISH (YANGI)
+from messages import (
+    get_welcome_msg, get_guide_msg, get_new_user_admin_msg,
+    get_pechat_text, get_pechat_html, HELP_MSG, AUDIO_RECEIVED_MSG,
+    VIEW_MODE_MSG, FORMAT_MODE_MSG
 )
 
 try:
@@ -48,18 +54,15 @@ async_lock = asyncio.Lock()
 waiting_users = 0
 user_data = {}
 
-# O'zbek tili uchun kuchliroq bo'lgan "small" modelni yuklaymiz
 @st.cache_resource
 def load_whisper():
     return whisper.load_model("small")
 
 model_local = load_whisper()
 
-# FAYLNING TAKRORLANMAS KODINI (HASH) OLISH UCHUN FUNKSIYA
 def get_file_hash(filepath):
     hasher = hashlib.md5()
     with open(filepath, 'rb') as f:
-        # Faylni RAMni to'ldirib yubormasligi uchun bo'laklab o'qiymiz
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
@@ -74,31 +77,17 @@ async def cmd_start(m: types.Message):
     if is_new:
         try:
             u_link = f"@{m.from_user.username}" if m.from_user.username else "Mavjud emas"
-            msg = (
-                f"🆕 <b>YANGI FOYDALANUVCHI:</b>\n"
-                f"👤 {m.from_user.full_name}\n"
-                f"🆔 <code>{m.from_user.id}</code>\n"
-                f"🔗 {u_link}"
-            )
+            msg = get_new_user_admin_msg(m.from_user.full_name, m.from_user.id, u_link, get_uz_time())
             await bot.send_message(ADMIN_ID, msg, parse_mode="HTML")
         except Exception: 
             pass
 
-    welcome = (
-        f"👋 <b>Assalomu alaykum, {m.from_user.first_name}!</b>\n\n"
-        f"🎙 <b>Suxandon AI</b> botiga xush kelibsiz.\n"
-        "🚀 Ishni boshlash uchun ovozli xabar yoki audio fayl yuboring!"
-    )
+    welcome = get_welcome_msg(m.from_user.first_name)
     await m.answer(welcome, reply_markup=get_main_menu(m.from_user.id), parse_mode="HTML")
 
 @dp.message(F.text == "ℹ️ Yordam")
 async def help_handler(m: types.Message):
-    txt = (
-        "📚 <b>Botdan qanday foydalaniladi?</b>\n"
-        "Audio yuboring, tarjima turi va formatni tanlang.\n"
-        "⚠️ Fayl hajmi max 20MB."
-    )
-    await m.answer(txt, parse_mode="HTML")
+    await m.answer(HELP_MSG, parse_mode="HTML")
 
 
 # ==========================================
@@ -107,7 +96,7 @@ async def help_handler(m: types.Message):
 @dp.message(F.text == "👨‍💻 Bog'lanish")
 async def contact_h(m: types.Message):
     await m.answer(
-        "👨‍💻 Adminga xabar yozish uchun tugmani bosing:", 
+        "👨‍💻 Admin bilan bog'lanish uchun quyidagi tugmani bosing va xabaringizni yozing:", 
         reply_markup=get_contact_kb(), 
         parse_mode="HTML"
     )
@@ -115,7 +104,10 @@ async def contact_h(m: types.Message):
 @dp.callback_query(F.data == "msg_to_admin")
 async def feedback_init(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(UserStates.waiting_for_contact_msg)
-    await call.message.answer("📝 <b>Xabaringizni yozing:</b>", parse_mode="HTML")
+    await call.message.answer(
+        "📝 <b>Xabaringizni yozing:</b>\n<i>(Bu xabar to'g'ridan-to'g'ri adminga boradi)</i>", 
+        parse_mode="HTML"
+    )
     await call.answer()
 
 @dp.message(UserStates.waiting_for_contact_msg)
@@ -129,9 +121,9 @@ async def feedback_done(m: types.Message, state: FSMContext):
     )
     try:
         await bot.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
-        await m.answer("✅ <b>Xabaringiz adminga yetkazildi!</b>", parse_mode="HTML")
+        await m.answer("✅ <b>Xabaringiz adminga yetkazildi!</b> Javobni kuting.", parse_mode="HTML")
     except Exception:
-        await m.answer("❌ Xatolik yuz berdi.")
+        await m.answer("❌ Xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.")
 
 @dp.message(F.chat.id == ADMIN_ID, F.reply_to_message)
 async def admin_reply_to_user(m: types.Message):
@@ -145,7 +137,7 @@ async def admin_reply_to_user(m: types.Message):
             await bot.send_message(target_id, f"👨‍💻 <b>Admin javobi:</b>\n\n{m.text}", parse_mode="HTML")
             await m.answer("✅ Javobingiz foydalanuvchiga muvaffaqiyatli yetkazildi.")
         except Exception as e:
-            await m.answer(f"❌ Xatolik: ({e})")
+            await m.answer(f"❌ Xatolik: Foydalanuvchi botni bloklagan bo'lishi mumkin. ({e})")
 
 
 # ==========================================
@@ -157,7 +149,7 @@ async def handle_audio_file(m: types.Message):
     file_size = m.audio.file_size if m.audio else m.voice.file_size
 
     if file_size > 20 * 1024 * 1024:
-        await m.answer("❌ <b>Hajm juda katta! Max: 20MB</b>", parse_mode="HTML")
+        await m.answer("❌ <b>Hajm juda katta!</b>\nIltimos, 20MB dan oshmaydigan audio yuboring.", parse_mode="HTML")
         return
 
     update_user(m.from_user, added_audio=True)
@@ -176,18 +168,17 @@ async def handle_audio_file(m: types.Message):
         'audio_name': audio_name
     }
     
-    explanation = "🌍 <b>Audio qabul qilindi! Endi tarjima usulini tanlang.</b>"
-    await m.answer(explanation, reply_markup=get_tr_kb(), parse_mode="HTML")
+    await m.answer(AUDIO_RECEIVED_MSG, reply_markup=get_tr_kb(), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("tr_"))
 async def set_translation_mode(call: types.CallbackQuery):
     user_data[call.message.chat.id]['tr_lang'] = call.data.replace("tr_", "")
-    await call.message.edit_text("📄 <b>Matn ko'rinishini tanlang:</b>", reply_markup=get_split_kb(), parse_mode="HTML")
+    await call.message.edit_text(VIEW_MODE_MSG, reply_markup=get_split_kb(), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("v_"))
 async def set_view_mode(call: types.CallbackQuery):
     user_data[call.message.chat.id]['view'] = call.data.replace("v_", "")
-    await call.message.edit_text("💾 <b>Natija formatini tanlang:</b>", reply_markup=get_format_kb(), parse_mode="HTML")
+    await call.message.edit_text(FORMAT_MODE_MSG, reply_markup=get_format_kb(), parse_mode="HTML")
 
 
 # =========================================================
@@ -201,14 +192,16 @@ async def run_analysis(call: types.CallbackQuery):
     data = user_data.get(chat_id)
     
     if not data:
-        await call.message.answer("❌ Xatolik. Qaytadan audio yuboring.")
+        await call.message.answer("❌ Ma'lumotlar topilmadi. Qaytadan audio yuboring.")
         return
 
     await call.message.delete()
     waiting_users += 1
-    wait_msg = await call.message.answer(f"⏳ <b>Navbatdasiz: {waiting_users}-o'rin</b>", parse_mode="HTML")
+    wait_msg = await call.message.answer(
+        f"⏳ <b>Navbatdasiz: {waiting_users}-o'rin</b>\nAI ishga tushmoqda...", 
+        parse_mode="HTML"
+    )
 
-    # Funksiya oxirida xotirani tozalash uchun lokal o'zgaruvchilarni oldindan ochib qo'yamiz
     segments = None
     res = None
     html_parts = []
@@ -220,18 +213,22 @@ async def run_analysis(call: types.CallbackQuery):
         async def update_live_bar(percent, status_text):
             blocks = int(percent // 10)
             bar = "🟩" * blocks + "⬜" * (10 - blocks)
+            icon = "🔄" if percent < 50 else "🧠" if percent < 90 else "✅"
             try: 
-                await wait_msg.edit_text(f"🚀 <b>{status_text}</b>\n<code>{bar}</code> {percent}%", parse_mode="HTML")
+                await wait_msg.edit_text(
+                    f"🚀 <b>Jarayon holati:</b> {status_text}\n"
+                    f"<code>{bar}</code> {percent}%\n\n"
+                    f"{icon} <i>Suxandon AI tahlil qilmoqda...</i>", 
+                    parse_mode="HTML"
+                )
             except Exception: 
                 pass
 
         try:
-            # 1. Yuklash
             await update_live_bar(10, "Audio yuklanmoqda...")
             f_info = await bot.get_file(data['fid'])
             await bot.download_file(f_info.file_path, a_path)
 
-            # 2. XESH BILAN TEKSHIRISH (Keshdan o'qish)
             await update_live_bar(20, "Baza tekshirilmoqda...")
             file_hash = get_file_hash(a_path)
             cached_segments = get_audio_cache(file_hash)
@@ -241,17 +238,11 @@ async def run_analysis(call: types.CallbackQuery):
                 segments = cached_segments
             else:
                 await update_live_bar(30, "AI tahlil qilmoqda (Bu biroz vaqt oladi)...")
-                # Whisper AI ni ishga tushirish
                 res = await asyncio.to_thread(model_local.transcribe, a_path)
-                
-                # Firestoreda toza saqlanishi uchun ma'lumotlarni tekislaymiz
                 segments = [{'start': float(s['start']), 'end': float(s['end']), 'text': str(s['text'])} for s in res['segments']]
-                
-                # Yangi audioni Firebase keshga saqlash
                 save_audio_cache(file_hash, segments)
                 await update_live_bar(40, "Nutq muvaffaqiyatli o'qildi.")
 
-            # 3. Tarjima va formatlash bosqichi
             tr_mode = data['tr_lang']
             total = len(segments)
             last_p = 40
@@ -285,17 +276,16 @@ async def run_analysis(call: types.CallbackQuery):
 
                 cur_p = 40 + int((i / total) * 50)
                 if cur_p >= last_p + 10:
-                    await update_live_bar(cur_p, "Matn moslashtirilmoqda...")
+                    await update_live_bar(cur_p, "Akademik tarjima tayyorlanmoqda...")
                     last_p = (cur_p // 10) * 10
 
-            # 4. Yakunlash
             await update_live_bar(95, "Natija shakllantirilmoqda...")
             bot_me = await bot.get_me()
             
-            pechat_txt = f"\n\n✅ Natija tayyor!\n\n👤 {data['uname']}\n🤖 @{bot_me.username}\n⏰ {get_uz_time()}"
-            pechat_html = f"\n\n<b>✅ Natija tayyor!</b>\n\n👤 {data['uname']}\n🤖 @{bot_me.username}\n⏰ {get_uz_time()}"
+            # messages.py dan pechatlarni olamiz
+            pechat_txt = get_pechat_text(data['uname'], bot_me.username, get_uz_time())
+            pechat_html = get_pechat_html(data['uname'], bot_me.username, get_uz_time())
             
-            # MATNNI BAZAGA SAQLASH (Foydalanuvchi tarixi uchun)
             full_txt_to_save = "\n\n".join(txt_parts) + pechat_txt
             save_transcript(chat_id, full_txt_to_save, audio_name=data.get('audio_name', 'Audio'))
             
@@ -325,22 +315,18 @@ async def run_analysis(call: types.CallbackQuery):
             await wait_msg.delete()
 
         except Exception as e:
-            await call.message.answer(f"❌ Xatolik: {e}")
+            await call.message.answer(f"❌ Xatolik yuz berdi: {e}")
         finally:
-            # Fayllarni o'chirish
             delete_temp_files(a_path, r_path)
-            
-            # Kutish navbatini kamaytirish
             waiting_users -= 1
             if chat_id in user_data: 
                 del user_data[chat_id]
                 
-            # RAM TOZALASH (Streamlit qotib qolmasligi uchun juda muhim qadam)
             del segments
             del res
             del html_parts
             del txt_parts
-            gc.collect() # Operativ xotirani majburiy bo'shatish
+            gc.collect() 
 
 
 # ==========================================
@@ -383,7 +369,13 @@ async def generate_user_list(call: types.CallbackQuery):
         uid = u.get('id', 'Noma\'lum')
         a_count = u.get('audio_count', 0)
         a_time = u.get('last_audio_time', 'Yubormagan')
-        msg_parts.append(f"<b>{i}. {name}</b> (ID: <code>{uid}</code>)\n   🎧 Audiolar: {a_count} ta | ⏳ Oxirgi marta: {a_time}\n")
+        joined = u.get('joined_at', 'Noma\'lum')
+        
+        msg_parts.append(
+            f"<b>{i}. {name}</b> (ID: <code>{uid}</code>)\n"
+            f"   📅 Qo'shilgan: {joined}\n"
+            f"   🎧 Audiolar: {a_count} ta | ⏳ Oxirgi: {a_time}\n"
+        )
         
     full_text = f"📋 <b>FOYDALANUVCHILAR RO'YXATI ({len(users)} ta):</b>\n\n" + "\n".join(msg_parts)
 
@@ -456,7 +448,11 @@ async def show_transcript_page(message: types.Message, user_id, transcripts, pag
     end_idx = start_idx + items_per_page
     page_items = transcripts[start_idx:end_idx]
     
-    text = f"📂 <b>Foydalanuvchi:</b> <code>{user_id}</code>\n📊 <b>Jami audiolari:</b> {len(transcripts)} ta\n📄 <b>Sahifa:</b> {page}/{total_pages}\n\n"
+    text = (
+        f"📂 <b>Foydalanuvchi:</b> <code>{user_id}</code>\n"
+        f"📊 <b>Jami audiolari:</b> {len(transcripts)} ta\n"
+        f"📄 <b>Sahifa:</b> {page}/{total_pages}\n\n"
+    )
     
     for idx, item in enumerate(page_items):
         name = item.get('audio_name', 'Nomsiz')
@@ -506,4 +502,22 @@ async def ts_send_handler(call: types.CallbackQuery):
     else:
         chunks = split_html_text(clean_text(full_text))
         for chunk in chunks:
-            await call.mes
+            await call.message.answer(chunk, parse_mode="HTML")
+            await asyncio.sleep(0.5)
+
+# ==========================================
+# 7. ADASHGANLAR UCHUN YO'RIQNOMA
+# ==========================================
+@dp.message(F.text == "🌐 Saytga kirish")
+async def web_h(m: types.Message):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🌐 Saytni ochish", url="https://shodlikai.github.io/new_3/dastur.html")
+    await m.answer("Veb-sahifaga o'tish:", reply_markup=kb.as_markup())
+
+@dp.message()
+async def unknown_handler(m: types.Message):
+    if m.text in ["🎧 Tahlil boshlash", "🌐 Saytga kirish", "👨‍💻 Bog'lanish", "ℹ️ Yordam", "🔑 Admin Panel"]: 
+        return
+        
+    guide = get_guide_msg(m.from_user.first_name)
+    await m.answer(guide, reply_markup=get_main_menu(m.from_user.id), parse_mode="HTML")
