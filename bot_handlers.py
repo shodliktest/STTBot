@@ -56,7 +56,7 @@ user_data = {}
 
 @st.cache_resource
 def load_whisper():
-    return whisper.load_model("small")
+    return whisper.load_model("base")
 
 model_local = load_whisper()
 
