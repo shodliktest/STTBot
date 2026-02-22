@@ -1,4 +1,4 @@
-name: Transcript App Wakeup
+name: STT transcript App Wakeup
 
 on:
   schedule:
