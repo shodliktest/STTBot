@@ -125,7 +125,6 @@ def get_stats():
     except Exception: 
         return {}
 
-
 # --- TRANSKRIPTLAR (MATNLAR) UCHUN FUNKSIYALAR ---
 def save_transcript(user_id, text, audio_name="Audio"):
     """Foydalanuvchi matnini Firebasega saqlash"""
@@ -162,4 +161,27 @@ def get_transcript_by_id(doc_id):
         return None
     except Exception: 
         return None
-        
+
+# ==================================================
+# YANGI QO'SHILGAN: AUDIO KESH (Vaqtni tejash uchun)
+# ==================================================
+def save_audio_cache(file_hash, segments):
+    """Audioni qayta tahlil qilmaslik uchun uning xeshini saqlash"""
+    try:
+        db.collection('audio_cache').document(file_hash).set({
+            'segments': segments,
+            'created_at': get_uz_time()
+        })
+    except Exception as e:
+        print(f"Cache save error: {e}")
+
+def get_audio_cache(file_hash):
+    """Xesh orqali tayyor tahlilni olish"""
+    try:
+        doc = db.collection('audio_cache').document(file_hash).get()
+        if doc.exists:
+            return doc.to_dict().get('segments')
+        return None
+    except Exception: 
+        return None
+    
