@@ -218,7 +218,7 @@ async def run_analysis(call: types.CallbackQuery):
                 await wait_msg.edit_text(
                     f"🚀 <b>Jarayon holati:</b> {status_text}\n"
                     f"<code>{bar}</code> {percent}%\n\n"
-                    f"{icon} <i>Suxandon AI tahlil qilmoqda...</i>", 
+                    f"{icon} <i>SHodlik AI tahlil qilmoqda...</i>", 
                     parse_mode="HTML"
                 )
             except Exception: 
