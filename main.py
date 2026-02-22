@@ -51,10 +51,16 @@ try:
             st.plotly_chart(fig, use_container_width=True)
             
         st.markdown("### 📋 Barcha Foydalanuvchilar")
-        show_cols = ['name', 'username', 'id', 'audio_count', 'last_audio_time']
+        
+        # YANGILANISH: Jadvalda qo'shilgan vaqtini ham ko'rsatamiz va ustun nomlarini chiroyli qilamiz
+        show_cols = ['name', 'username', 'id', 'joined_at', 'audio_count', 'last_audio_time']
         for c in show_cols: 
             if c not in df.columns: df[c] = "-"
-        st.dataframe(df[show_cols], use_container_width=True, hide_index=True)
+            
+        df_display = df[show_cols].copy()
+        df_display.columns = ["Ism", "Username", "ID", "Qo'shilgan vaqti", "Audio Soni", "Oxirgi faollik"]
+        
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
         
 except Exception as e:
     st.warning(f"Xatolik: {e}")
