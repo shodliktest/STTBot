@@ -56,7 +56,7 @@ user_data = {}
 
 @st.cache_resource
 def load_whisper():
-    return whisper.load_model("small")
+    return whisper.load_model("base")
 
 model_local = load_whisper()
 
@@ -238,7 +238,7 @@ async def run_analysis(call: types.CallbackQuery):
                 segments = cached_segments
             else:
                 await update_live_bar(30, "AI tahlil qilmoqda (Bu biroz vaqt oladi)...")
-                res = await asyncio.to_thread(model_local.transcribe, a_path, language="uz")
+                res = await asyncio.to_thread(model_local.transcribe, a_path)
                 segments = [{'start': float(s['start']), 'end': float(s['end']), 'text': str(s['text'])} for s in res['segments']]
                 save_audio_cache(file_hash, segments)
                 await update_live_bar(40, "Nutq muvaffaqiyatli o'qildi.")
