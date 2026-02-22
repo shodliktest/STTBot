@@ -12,13 +12,11 @@ def get_uz_time():
 # --- FIREBASE ULANISHI ---
 if not firebase_admin._apps:
     try:
-        # Streamlit veb-panelidagi Secrets'dan ma'lumotlarni o'qish
         if "firebase" in st.secrets:
             cred_dict = dict(st.secrets["firebase"])
         else:
             cred_dict = dict(st.secrets)
 
-        # TOML formati ba'zan \n belgisini matn qilib qo'yadi, shuni to'g'irlaymiz
         if "private_key" in cred_dict:
             cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
 
@@ -28,7 +26,6 @@ if not firebase_admin._apps:
         st.error(f"❌ Firebase ulanish xatosi (Secrets qismini tekshiring): {e}")
         st.stop()
 
-# Baza obyekti
 try:
     db = firestore.client()
 except Exception as e:
@@ -81,7 +78,7 @@ def update_stats(file_type, output_format):
         if not stat_ref.get().exists:
             stat_ref.set({
                 "total_processed": 0, "audio": 0, "video": 0, 
-                "format_txt": 0, "format_chat": 0
+                "format_txt": 0, "format_chat": 0, "page_views": 0
             })
         
         batch = db.batch()
@@ -100,6 +97,20 @@ def update_stats(file_type, output_format):
         batch.commit()
     except Exception as e:
         print(f"Stats Error: {e}")
+
+# --- YANGI: TASHRIFLARNI SANASH ---
+def increment_page_view():
+    """Veb-panelga kirganlar sonini oshirish"""
+    try:
+        stat_ref = db.collection('settings').document('stats')
+        if not stat_ref.get().exists:
+            stat_ref.set({
+                "total_processed": 0, "audio": 0, "video": 0, 
+                "format_txt": 0, "format_chat": 0, "page_views": 0
+            })
+        stat_ref.update({"page_views": firestore.Increment(1)})
+    except Exception as e:
+        print(f"Page View Error: {e}")
 
 def get_all_users():
     """Barcha userlarni olish"""
