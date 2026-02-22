@@ -7,3 +7,4 @@ torch
 pandas
 numpy
 plotly
+firebase-admin
