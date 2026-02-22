@@ -1,92 +1,124 @@
 import streamlit as st
-import threading
-import asyncio
-import pandas as pd
-import plotly.graph_objects as go
+import firebase_admin
+from firebase_admin import credentials, firestore
 from datetime import datetime
+import pytz
 
-# BIZNING MODULLAR
-from config import BOT_TOKEN
-from bot_handlers import dp, bot
-from database import get_all_users, get_stats
+UZ_TZ = pytz.timezone('Asia/Tashkent')
 
-# --- 1. PAGE CONFIG & NEON CSS ---
-st.set_page_config(page_title="Suxandon AI Admin", page_icon="⚡", layout="wide")
+def get_uz_time():
+    return datetime.now(UZ_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
-st.markdown("""
-    <style>
-    .stApp { background-color: #0e1117; color: #00ffcc; }
-    div[data-testid="stMetric"] {
-        background-color: #1c1f26; border: 2px solid #00ffcc;
-        border-radius: 10px; padding: 15px;
-        box-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc inset; text-align: center;
-    }
-    div[data-testid="stMetricLabel"] { color: #ff00ff !important; font-weight: bold; }
-    div[data-testid="stMetricValue"] { color: #ffffff !important; }
-    </style>
-""", unsafe_allow_html=True)
+# --- FIREBASE ULANISHI ---
+if not firebase_admin._apps:
+    try:
+        # Streamlit veb-panelidagi Secrets'dan ma'lumotlarni o'qish
+        if "firebase" in st.secrets:
+            cred_dict = dict(st.secrets["firebase"])
+        else:
+            cred_dict = dict(st.secrets)
 
-# --- 2. FIREBASE MA'LUMOTLARINI OLISH ---
+        # TOML formati ba'zan \n belgisini matn qilib qo'yadi, shuni to'g'irlaymiz
+        if "private_key" in cred_dict:
+            cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        st.error(f"❌ Firebase ulanish xatosi (Secrets qismini tekshiring): {e}")
+        st.stop()
+
+# Baza obyekti
 try:
-    users = get_all_users()
-    stats = get_stats()
-    total_users = len(users)
-    total_processed = stats.get('total_processed', 0)
-    audio_count = stats.get('audio', 0)
-    
-    st.title("⚡ Suxandon AI - Boshqaruv Paneli")
-    
-    # --- 3. METRIKALAR ---
-    col1, col2, col3 = st.columns(3)
-    with col1: st.metric(label="👥 Jami Foydalanuvchilar", value=f"{total_users} ta")
-    with col2: st.metric(label="🔄 Tahlil qilingan fayllar", value=f"{total_processed} ta")
-    with col3: st.metric(label="🎙 Audio Tahlillar", value=f"{audio_count} ta")
-
-    # --- 4. FOYDALANUVCHILAR JADVALI ---
-    st.markdown("### 📋 Oxirgi qo'shilgan foydalanuvchilar")
-    if users:
-        df = pd.DataFrame(users)
-        # Jadval ustunlarini chiroyli tartiblash
-        df = df[['name', 'username', 'id', 'audio_count', 'last_audio_time', 'joined_at']]
-        df.columns = ["Ism", "Username", "ID", "Audio Soni", "Oxirgi Audio", "Qo'shilgan vaqti"]
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.info("Hozircha foydalanuvchilar yo'q.")
-
+    db = firestore.client()
 except Exception as e:
-    st.warning(f"Baza ma'lumotlari yuklanishida xatolik: {e}")
+    st.error(f"❌ Firestore xatosi: {e}")
+    st.stop()
 
-# --- 5. BOT RUNNER (ENG MUHIM QISM - KILLER & SINGLETON) ---
-def run_bot_in_background():
-    """Botni alohida oqimda va xavfsiz ishga tushirish"""
-    
-    async def _runner():
-        try:
-            # 1. KILLER: Eski webhooklarni o'chirish (Conflict oldini olish, server qotmasligi uchun)
-            await bot.delete_webhook(drop_pending_updates=True)
-            # 2. BOTNI YOQISH
-            await dp.start_polling(bot, handle_signals=False)
-        except Exception as e:
-            print(f"Bot Error: {e}")
+# --- DB FUNKSIYALARI ---
 
-    def _thread_target():
-        # Yangi event loop ochamiz (Streamlit bilan urushmasligi uchun)
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        new_loop.run_until_complete(_runner())
+def update_user(user, added_audio=False):
+    """Foydalanuvchini bazaga qo'shish yoki yangilash."""
+    try:
+        user_ref = db.collection('users').document(str(user.id))
+        doc = user_ref.get()
+        
+        now = get_uz_time()
+        username = f"@{user.username}" if user.username else "Mavjud emas"
+        
+        if not doc.exists:
+            user_data = {
+                "id": str(user.id),
+                "name": user.full_name,
+                "username": username,
+                "joined_at": now,
+                "last_active": now,
+                "audio_count": 1 if added_audio else 0,
+                "last_audio_time": now if added_audio else "Hali yubormagan"
+            }
+            user_ref.set(user_data)
+            return True
+        else:
+            update_data = {
+                "name": user.full_name,
+                "username": username,
+                "last_active": now
+            }
+            if added_audio:
+                update_data["audio_count"] = firestore.Increment(1)
+                update_data["last_audio_time"] = now
+                
+            user_ref.update(update_data)
+            return False
+    except Exception as e:
+        print(f"DB Update Error: {e}")
+        return False
 
-    # SINGLETON: Agar thread allaqachon ishlayotgan bo'lsa, ikkinchisini ochmaymiz
-    thread_name = "TelegramBotThread"
-    is_running = False
-    for t in threading.enumerate():
-        if t.name == thread_name:
-            is_running = True
-            break
+def update_stats(file_type, output_format):
+    """Statistikani yangilash"""
+    try:
+        stat_ref = db.collection('settings').document('stats')
+        if not stat_ref.get().exists:
+            stat_ref.set({
+                "total_processed": 0, "audio": 0, "video": 0, 
+                "format_txt": 0, "format_chat": 0
+            })
+        
+        batch = db.batch()
+        batch.update(stat_ref, {"total_processed": firestore.Increment(1)})
+        
+        if file_type == 'audio':
+            batch.update(stat_ref, {"audio": firestore.Increment(1)})
+        else:
+            batch.update(stat_ref, {"video": firestore.Increment(1)})
             
-    if not is_running:
-        # Daemon=True -> Streamlit o'chsa, bot ham o'chadi (osilib qolmaydi)
-        bot_thread = threading.Thread(target=_thread_target, name=thread_name, daemon=True)
-        bot_thread.start()
+        if output_format == 'txt':
+            batch.update(stat_ref, {"format_txt": firestore.Increment(1)})
+        else:
+            batch.update(stat_ref, {"format_chat": firestore.Increment(1)})
+            
+        batch.commit()
+    except Exception as e:
+        print(f"Stats Error: {e}")
 
-# Botni fon rejimida ishga tushirish
-run_bot_in_background()
+def get_all_users():
+    """Barcha userlarni olish"""
+    try:
+        users = []
+        docs = db.collection('users').order_by('joined_at', direction=firestore.Query.DESCENDING).stream()
+        for doc in docs:
+            users.append(doc.to_dict())
+        return users
+    except Exception as e:
+        print(f"Get Users Error: {e}")
+        return []
+
+def get_stats():
+    """Statistikani o'qish"""
+    try:
+        doc = db.collection('settings').document('stats').get()
+        if doc.exists:
+            return doc.to_dict()
+        return {}
+    except:
+        return {}
