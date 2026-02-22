@@ -9,7 +9,7 @@ from bot_handlers import dp, bot
 from database import get_all_users, get_stats, increment_page_view
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Suxandon AI Admin", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="SHodlik AI STT Admin", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
@@ -29,7 +29,7 @@ try:
     users = get_all_users()
     stats = get_stats()
     
-    st.title("⚡ Suxandon AI - Boshqaruv Paneli")
+    st.title("⚡ SHodlik AI STT - Boshqaruv Paneli")
     
     # METRIKALAR
     c1, c2, c3, c4 = st.columns(4)
