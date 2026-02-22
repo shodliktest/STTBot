@@ -6,13 +6,11 @@ from datetime import datetime
 UZ_TZ = pytz.timezone('Asia/Tashkent')
 
 def get_uz_time():
-    """Hozirgi sanani qaytaradi: YYYY.MM.DD HH:MM:SS"""
-    return datetime.now(UZ_TZ).strftime('%Y.%m.%d %H:%M:%S')
+    """Hozirgi sanani qaytaradi: YYYY-MM-DD HH:MM:SS"""
+    return datetime.now(UZ_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
 def clean_text(text):
-    """
-    Telegram HTML rejimi uchun matnni tozalash.
-    """
+    """Telegram HTML rejimi uchun matnni tozalash."""
     if not text:
         return ""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -33,10 +31,7 @@ def format_time_stamp(seconds):
     return f"[{minutes:02d}:{secs:02d}]"
 
 def split_html_text(text, limit=4000):
-    """
-    HTML matnni xavfsiz bo'laklarga bo'lish mantiqi.
-    Agar matn limitdan oshsa, uni xatboshilar bo'yicha bo'ladi.
-    """
+    """HTML matnni xavfsiz bo'laklarga bo'lish (uzun xabarlar uchun)."""
     if len(text) <= limit:
         return [text]
     
@@ -46,16 +41,14 @@ def split_html_text(text, limit=4000):
             chunks.append(text)
             break
         
-        # Eng yaqin xatboshini topish
         split_at = text.rfind('\n\n', 0, limit)
         if split_at == -1:
             split_at = text.rfind('\n', 0, limit)
         if split_at == -1:
-            split_at = text.rfind(' ', 0, limit)
+            split_at = text.rfind('. ', 0, limit)
         if split_at == -1:
             split_at = limit
             
         chunks.append(text[:split_at])
         text = text[split_at:].lstrip()
     return chunks
-    
