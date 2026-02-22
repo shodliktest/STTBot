@@ -50,7 +50,6 @@ model_local = load_whisper()
 # --- 1. START VA YORDAM ---
 @dp.message(Command("start"))
 async def cmd_start(m: types.Message):
-    # Firebase'ga qo'shish va yangi foydalanuvchi bo'lsa adminga to'liq xabar berish
     is_new = update_user(m.from_user, added_audio=False)
     
     if is_new:
@@ -85,7 +84,7 @@ async def help_handler(m: types.Message):
     )
     await m.answer(help_text, parse_mode="HTML")
 
-# --- 2. ADMIN BILAN ALOQA (REPLY MANTIQI TO'LIQ TIKLANDI) ---
+# --- 2. ADMIN BILAN ALOQA ---
 @dp.message(F.text == "👨‍💻 Bog'lanish")
 async def contact_h(m: types.Message):
     await m.answer("👨‍💻 Admin bilan bog'lanish uchun quyidagi tugmani bosing va xabaringizni yozing:", reply_markup=get_contact_kb(), parse_mode="HTML")
@@ -93,13 +92,12 @@ async def contact_h(m: types.Message):
 @dp.callback_query(F.data == "msg_to_admin")
 async def feedback_init(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(UserStates.waiting_for_contact_msg)
-    await call.message.answer("📝 <b>Xabaringizni yozing:</b>\n<i>(Bu xabar to'g'ridan-to'g'ri adminga boradi va admin sizga bot orqali javob qaytara oladi)</i>", parse_mode="HTML")
+    await call.message.answer("📝 <b>Xabaringizni yozing:</b>\n<i>(Bu xabar to'g'ridan-to'g'ri adminga boradi)</i>", parse_mode="HTML")
     await call.answer()
 
 @dp.message(UserStates.waiting_for_contact_msg)
 async def feedback_done(m: types.Message, state: FSMContext):
     await state.clear()
-    
     admin_msg = (
         f"📩 <b>YANGI MUROJAAT:</b>\n"
         f"👤 Kimdan: {m.from_user.full_name}\n"
@@ -112,22 +110,16 @@ async def feedback_done(m: types.Message, state: FSMContext):
     except Exception as e:
         await m.answer("❌ Xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.")
 
-# ADMIN REPLY (Admin userga javob qaytarishi)
 @dp.message(F.chat.id == ADMIN_ID, F.reply_to_message)
 async def admin_reply_to_user(m: types.Message):
     original_text = m.reply_to_message.text
     if not original_text: return
     
-    # ID ni matn ichidan qidirish (Murojaat xabaridagi formatdan)
     match = re.search(r"ID:\s*(\d+)", original_text)
     if match:
         target_user_id = int(match.group(1))
         try:
-            await bot.send_message(
-                target_user_id, 
-                f"👨‍💻 <b>Admin javobi:</b>\n\n{m.text}", 
-                parse_mode="HTML"
-            )
+            await bot.send_message(target_user_id, f"👨‍💻 <b>Admin javobi:</b>\n\n{m.text}", parse_mode="HTML")
             await m.answer("✅ Javobingiz foydalanuvchiga muvaffaqiyatli yetkazildi.")
         except Exception as e:
             await m.answer(f"❌ Xatolik: Foydalanuvchi botni bloklagan bo'lishi mumkin. ({e})")
@@ -142,13 +134,12 @@ async def handle_audio_file(m: types.Message):
         await m.answer("❌ <b>Hajm juda katta!</b>\nIltimos, 20MB dan oshmaydigan audio yuboring.", parse_mode="HTML")
         return
 
-    # Foydalanuvchining audio tashlaganini Firebase'da qayd etish
     update_user(m.from_user, added_audio=True)
-
     u_tag = f"@{m.from_user.username}" if m.from_user.username else m.from_user.full_name
+    
     user_data[m.chat.id] = {
         'fid': file_id, 
-        'mid': m.message_id, # REPLY UCHUN SAQLAYMIZ
+        'mid': m.message_id, 
         'uname': u_tag, 
         'tr_lang': None, 
         'view': None
@@ -165,7 +156,6 @@ async def handle_audio_file(m: types.Message):
 @dp.callback_query(F.data.startswith("tr_"))
 async def set_translation_mode(call: types.CallbackQuery):
     user_data[call.message.chat.id]['tr_lang'] = call.data.replace("tr_", "")
-    
     view_explanation = (
         "📄 <b>Matn ko'rinishini tanlang:</b>\n\n"
         "⏱ <b>Time Split:</b> Matnni sekundlar [00:15] bo'yicha bo'laklaydi.\n"
@@ -176,7 +166,6 @@ async def set_translation_mode(call: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("v_"))
 async def set_view_mode(call: types.CallbackQuery):
     user_data[call.message.chat.id]['view'] = call.data.replace("v_", "")
-    
     format_explanation = (
         "💾 <b>Natijani qanday olishni tanlang:</b>\n\n"
         "📁 <b>TXT Fayl:</b> Barcha matn hujjat (.txt) ko'rinishida keladi.\n"
@@ -184,7 +173,7 @@ async def set_view_mode(call: types.CallbackQuery):
     )
     await call.message.edit_text(format_explanation, reply_markup=get_format_kb(), parse_mode="HTML")
 
-# --- 4. ASOSIY PROTSESSOR (PROGRESS BAR BILAN) ---
+# --- 4. ASOSIY PROTSESSOR ---
 @dp.callback_query(F.data.startswith("f_"))
 async def run_analysis(call: types.CallbackQuery):
     global waiting_users
@@ -217,18 +206,18 @@ async def run_analysis(call: types.CallbackQuery):
             except: pass
 
         try:
-            # Bosqich 1: Yuklash
+            # 1. Yuklash
             await update_live_bar(10, "Audio yuklanmoqda...")
             f_info = await bot.get_file(data['fid'])
             await bot.download_file(f_info.file_path, a_path)
 
-            # Bosqich 2: Whisper AI
+            # 2. Transkripsiya
             await update_live_bar(30, "AI ovozdagi so'zlarni tanimoqda...")
             res = await asyncio.to_thread(model_local.transcribe, a_path)
             segments = res['segments']
             await update_live_bar(40, "Nutq muvaffaqiyatli o'qildi.")
 
-            # Bosqich 3: Tarjima
+            # 3. Tarjima
             tr_mode = data['tr_lang']
             html_parts, txt_parts = [], []
             total = len(segments)
@@ -259,30 +248,47 @@ async def run_analysis(call: types.CallbackQuery):
                     html_parts.append(f"{clean_text(raw)}{tr_html}")
                     txt_parts.append(f"{raw}{tr_txt}")
 
-                # Progress
                 cur_p = 40 + int((i / total) * 50)
                 if cur_p >= last_p + 10:
                     await update_live_bar(cur_p, "Akademik tarjima tayyorlanmoqda...")
                     last_p = (cur_p // 10) * 10
 
-            # Bosqich 4: Yuborish
+            # 4. YAKUNLASH VA PECHAT QO'SHISH
             await update_live_bar(95, "Natija shakllantirilmoqda...")
             bot_me = await bot.get_me()
-            footer = f"\n\n---\n👤 Tayyorladi: {data['uname']}\n🤖 Bot: @{bot_me.username}\n⏰ Vaqt: {get_uz_time()}"
+            
+            # --- PECHATLAR ---
+            pechat_txt = (
+                f"\n\n✅ Natija tayyor!\n\n"
+                f"👤 {data['uname']}\n"
+                f"🤖 @{bot_me.username}\n"
+                f"⏰ {get_uz_time()}"
+            )
+            
+            pechat_html = (
+                f"\n\n<b>✅ Natija tayyor!</b>\n\n"
+                f"👤 {data['uname']}\n"
+                f"🤖 @{bot_me.username}\n"
+                f"⏰ {get_uz_time()}"
+            )
             
             update_stats('audio', fmt)
 
             if fmt == "txt":
+                # TXT faylning ichiga qo'shamiz
                 with open(r_path, "w", encoding="utf-8") as f:
-                    f.write("\n\n".join(txt_parts) + footer.replace("<b>","").replace("</b>",""))
+                    f.write("\n\n".join(txt_parts) + pechat_txt)
+                
+                # Fayl tagidagi captionga ham qo'shamiz
                 await call.message.answer_document(
                     types.FSInputFile(r_path), 
-                    caption="✅ <b>Akademik tahlil tayyor!</b>", 
+                    caption=pechat_html, 
                     reply_to_message_id=data['mid'], 
                     parse_mode="HTML"
                 )
             else:
-                full_html = "\n\n".join(html_parts) + footer
+                # Chat uchun qo'shamiz
+                full_html = "\n\n".join(html_parts) + pechat_html
                 chunks = split_html_text(full_html)
                 for chunk in chunks:
                     try:
@@ -302,7 +308,7 @@ async def run_analysis(call: types.CallbackQuery):
             waiting_users -= 1
             if chat_id in user_data: del user_data[chat_id]
 
-# --- 5. ADMIN PANEL (YANGILANGAN MANTIQ) ---
+# --- 5. ADMIN PANEL ---
 @dp.message(F.text == "🔑 Admin Panel", F.chat.id == ADMIN_ID)
 async def admin_main(m: types.Message):
     await m.answer("🛠 <b>Admin Boshqaruv Paneli</b>", reply_markup=get_admin_kb(), parse_mode="HTML")
@@ -320,7 +326,6 @@ async def stats_cb(call: types.CallbackQuery):
     await call.message.answer(msg, parse_mode="HTML")
     await call.answer()
 
-# FORMAT SO'RASH QISMI
 @dp.callback_query(F.data == "adm_list_menu")
 async def list_menu_cb(call: types.CallbackQuery):
     await call.message.edit_text("📋 <b>Ro'yxatni qaysi formatda olmoqchisiz?</b>", reply_markup=get_list_format_kb(), parse_mode="HTML")
@@ -335,7 +340,6 @@ async def generate_user_list(call: types.CallbackQuery):
         await call.message.answer("❌ Hozircha foydalanuvchilar yo'q.")
         return
 
-    # Matnni shakllantirish (Audio soni va vaqti bilan)
     msg_parts = []
     for i, u in enumerate(users, 1):
         name = u.get('name', 'Nomsiz')
@@ -349,7 +353,6 @@ async def generate_user_list(call: types.CallbackQuery):
     full_text = f"📋 <b>FOYDALANUVCHILAR RO'YXATI ({len(users)} ta):</b>\n\n" + "\n".join(msg_parts)
 
     if format_type == "txt":
-        # TXT formatida yuborish
         file_name = "user_list.txt"
         clean_full_text = clean_text(full_text).replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         with open(file_name, "w", encoding="utf-8") as f:
@@ -357,7 +360,6 @@ async def generate_user_list(call: types.CallbackQuery):
         await call.message.answer_document(types.FSInputFile(file_name), caption="📋 Barcha foydalanuvchilar ro'yxati.")
         os.remove(file_name)
     else:
-        # Chat ko'rinishida yuborish (Bo'laklab)
         chunks = split_html_text(full_text)
         for chunk in chunks:
             await call.message.answer(chunk, parse_mode="HTML")
@@ -365,7 +367,7 @@ async def generate_user_list(call: types.CallbackQuery):
 
 @dp.callback_query(F.data == "adm_bc")
 async def bc_cb(call: types.CallbackQuery, state: FSMContext):
-    await call.message.answer("📢 <b>Broadcast:</b> Hammaga yuboriladigan xabarni (rasm, video, matn) tashlang:")
+    await call.message.answer("📢 <b>Broadcast:</b> Hammaga yuboriladigan xabarni tashlang:")
     await state.set_state(AdminStates.waiting_for_bc)
     await call.answer()
 
