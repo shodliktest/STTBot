@@ -38,7 +38,7 @@ jobs:
                   page = context.new_page()
                   
                   # SIZNING YANGI LINKINGIZ:
-                  url = 'https://quizmakerbot-hwttylmp5igdczywefchjt.streamlit.app/'
+                  url = 'https://audiov.streamlit.app/'
                   
                   for attempt in range(1, 4):
                       print(f'🚀 Urinish #{attempt}: {url} ga kirilmoqda...')
