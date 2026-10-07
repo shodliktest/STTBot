@@ -95,3 +95,13 @@ def get_transcript_format_kb(doc_id):
     kb.button(text="📁 TXT Faylida olish", callback_data=f"ts_fmt_txt_{doc_id}")
     kb.adjust(2)
     return kb.as_markup()
+
+
+def get_user_list_pagination_kb(page: int, fmt: str, has_next: bool = True, has_prev: bool = False):
+    kb = InlineKeyboardBuilder()
+    if has_prev:
+        kb.button(text="⬅️ Oldingi", callback_data=f"users_pg_{page-1}_{fmt}")
+    if has_next:
+        kb.button(text="➡️ Keyingi", callback_data=f"users_pg_{page+1}_{fmt}")
+    kb.adjust(2)
+    return kb.as_markup()
